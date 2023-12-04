@@ -5,10 +5,7 @@ use std::ptr::null_mut;
 
 use core::cell::UnsafeCell;
 
-use esp_idf_hal::sys::EspError;
-
 use esp_idf_sys::{
-    self,
     esp_lcd_new_rgb_panel,
     esp_lcd_panel_del,
     esp_lcd_panel_draw_bitmap,
@@ -20,11 +17,11 @@ use esp_idf_sys::{
     //esp_lcd_rgb_panel_get_frame_buffer,
     esp_lcd_rgb_timing_t,
     esp_lcd_rgb_timing_t__bindgen_ty_1,
+    soc_periph_lcd_clk_src_t,
     soc_periph_lcd_clk_src_t_LCD_CLK_SRC_PLL160M,
+    esp,
+    EspError,
 };
-
-use crate::lcd_panel::esp_idf_sys::esp;
-use crate::lcd_panel::esp_idf_sys::soc_periph_lcd_clk_src_t;
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub struct PanelConfig {
