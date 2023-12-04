@@ -1,13 +1,11 @@
 //! This code was produced from the work done by this person [this repo](https://github.com/anlumo/ESP32-8048S070-Rust/tree/main)
 //! He did all the heavy lifting I just expanded on his work.
 //! The default configuration and timings are based upon the Aliexpress Esp32S-8048S070C development board.
-
-use esp_idf_hal::sys::EspError;
-use esp_idf_sys::*;
-
 use std::ptr::null_mut;
 
 use core::cell::UnsafeCell;
+
+use esp_idf_hal::sys::EspError;
 
 use esp_idf_sys::{
     self,
@@ -24,6 +22,9 @@ use esp_idf_sys::{
     esp_lcd_rgb_timing_t__bindgen_ty_1,
     soc_periph_lcd_clk_src_t_LCD_CLK_SRC_PLL160M,
 };
+
+use crate::lcd_panel::esp_idf_sys::esp;
+use crate::lcd_panel::esp_idf_sys::soc_periph_lcd_clk_src_t;
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub struct PanelConfig {
@@ -385,7 +386,7 @@ impl LcdPanel {
 
         let panel_config = esp_lcd_rgb_panel_config_t {
             clk_src: panel_config.clk_src,
-            timings: timings,
+            timings,
             data_width: panel_config.data_width,
             bits_per_pixel: panel_config.bits_per_pixel,
             num_fbs: panel_config.num_fbs,
