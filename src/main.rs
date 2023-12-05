@@ -78,7 +78,7 @@ fn main() {
                 refresh.area.y1.into(),
                 (refresh.area.x2 + 1i16).into(),
                 (refresh.area.y2 + 1i16).into(),
-                refresh.colors.into_iter(),
+                refresh.colors,
             )
             .unwrap();
     })
@@ -117,7 +117,7 @@ fn main() {
 
         let val = CString::new(format!("21:{:02}", i)).unwrap();
         time.set_text(&val).unwrap();
-        i = 1 + i;
+        i += 1;
 
         lvgl::task_handler();
 

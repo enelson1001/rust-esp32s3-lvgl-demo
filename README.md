@@ -9,10 +9,17 @@ Aliexpress ESP32-8048S070 - 7 inch 800x400 TN RGB with ESP32S3, 8M PSRAM, 16M Fl
 This application shows how to use lv-binding-rust crate on a ESP32S3 device.  The program will display a clock time on a blue backgound screen.
 The clock time is a simulated time of 21:00 to 21::59 where the seconds are incremented each second and repeats the 00-59 seconds forever.
 
+## Comments
+I use linux-mint as my development PC and I had to install gcc-multilib or else I got an error 'bits/libc-header-start.h' file not found.
+
+```
+$ sudo apt update
+$ sudo apt upgrade
+$ sudo apt-get install gcc-multilib
+```
 
 ## partition-table folder
-The partition-table folder contains a file called partitons.csv.  This file increases the default factory/app partiton from the default of 1M to 3M.  
-This allows us more space for our program and since the flash size is 16M this should not be a problem.  This file will be called when we flash the device.
+The partition-table folder contains a file called partitons.csv.  This file increases the default factory/app partiton from the default of 1M to 3M. This allows us more space for our program and since the flash size is 16M this should not be a problem.  This file will be called when we flash the device.
 
 ## custom-fonts folder
 The custom-fonts folder contains our custom fonts.  The customs fonts are converted from TTF fonts using lvgl online font converter at https://lvgl.io/tools/fontconverter.  I used https://ttfonts.net to find a font I liked and then downloaded the font.  In the lvgl-online-font-converter I used the font name plus the font size for the name of the font.  I chose Bpp of 2 bit-per-pixel and set the range of 0x30-0x3A since I only need numbers and the ":" character.  After clicking on "Convert" the file will be downloaded. I placed this downloaded file (*.c) into the custom-fonts folder.  Then I created a header file which has an extern to my *.c file, along with changing the ifndef and define names.  
@@ -39,31 +46,30 @@ CONFIG_SPIRAM_FETCH_INSTRUCTIONS=y
 CONFIG_SPIRAM_RODATA=y
 ```
 
-## bindings.h file in project root directory
-This file contains additional bindings required for using esp_lcd_panel esp-idf component that is available on the ESP32S3 device.
-
 ## Cargo.toml project file
 I added the following to the "dependencies" section.
 ```
-esp-idf-hal = { version = "0.42.1" }
-esp-idf-sys = { version = "0.33.3" }
+esp-idf-hal = { version = "0.42.5" }
+esp-idf-sys = { version = "0.33.7"}
 
 cstr_core = "0.2.1"
 embedded-graphics-core = "0.4.0"
 
-lvgl = { git = "https://github.com/enelson1001/lv_binding_rust", version = "0.6.2", default-features = false, features = [
+lvgl = { version = "0.6.2", default-features = false, features = [
     "embedded_graphics",
     "unsafe_no_autoinit",
 ] }
 
-lvgl-sys = { git = "https://github.com/enelson1001/lv_binding_rust", version = "0.6.2" }
+lvgl-sys = { version = "0.6.2" }
 
 ```
 
-You need to a 'package.metadata.esp-idf-sys' section so the bindings.h file will be include.
+Also included patch.crates-io section to patch esp-idf-sys, lvgl and lvgl-sys
 ```
-[package.metadata.esp-idf-sys]
-extra_components = [{ bindings_header = "bindings.h" }]
+[patch.crates-io]
+esp-idf-sys = { git = "https://github.com/esp-rs/esp-idf-sys"}
+lvgl = { git = "https://github.com/enelson1001/lv_binding_rust"}
+lvgl-sys = { git = "https://github.com/enelson1001/lv_binding_rust"}
 
 ```
 
@@ -107,11 +113,6 @@ LVGL_FONTS_DIR = {relative = true, value = "custom-fonts"}
 
 ## lv-binding-rust fork
 I updated my fork of lv-binding-rust to include PR153 ie the changes recommended by madwizard-thomas.
-
-
-## Building the project
-The changes to config.toml, Cargo.toml and to build.rs allowed me to build lv-binding-rust without any errors. I do get 2 warnings about va_list not being FFI-safe.
-
 
 ## Flashing the ESP32S3 device
 I used the following command to flash the ESP32S3 device.

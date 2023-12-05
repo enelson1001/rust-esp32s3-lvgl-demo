@@ -27,21 +27,24 @@ embassy = ["esp-idf-svc/embassy-sync", "esp-idf-svc/critical-section", "esp-idf-
 log = { version = "0.4", default-features = false }
 esp-idf-svc = { version = "0.47.3", default-features = false }
 
-esp-idf-hal = { version = "0.42.1" }
-esp-idf-sys = { version = "0.33.3" }
+esp-idf-hal = { version = "0.42.5" }
+esp-idf-sys = { version = "0.33.7"}
 
 cstr_core = "0.2.1"
 embedded-graphics-core = "0.4.0"
 
-lvgl = { git = "https://github.com/enelson1001/lv_binding_rust", version = "0.6.2", default-features = false, features = [
+lvgl = { version = "0.6.2", default-features = false, features = [
     "embedded_graphics",
     "unsafe_no_autoinit",
 ] }
 
-lvgl-sys = { git = "https://github.com/enelson1001/lv_binding_rust", version = "0.6.2" }
+lvgl-sys = { version = "0.6.2" }
 
 [build-dependencies]
 embuild = "0.31.3"
 
-[package.metadata.esp-idf-sys]
-extra_components = [{ bindings_header = "bindings.h" }]
+
+[patch.crates-io]
+esp-idf-sys = { git = "https://github.com/esp-rs/esp-idf-sys"}
+lvgl = { git = "https://github.com/enelson1001/lv_binding_rust"}
+lvgl-sys = { git = "https://github.com/enelson1001/lv_binding_rust"}

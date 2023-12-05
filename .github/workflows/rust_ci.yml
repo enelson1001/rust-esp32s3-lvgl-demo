@@ -31,7 +31,7 @@ jobs:
       - name: Enable caching
         uses: Swatinem/rust-cache@v2
       - name: Install gcc-multilib
-        run: sudo apt-get install g++-multilib
+        run: sudo apt-get install gcc-multilib
       - name: Setup Rust
         uses: esp-rs/xtensa-toolchain@v1.5
         with:
