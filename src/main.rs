@@ -4,22 +4,25 @@ pub mod lcd_panel;
 use log::*;
 
 use cstr_core::CString;
+use std::time::Duration;
 
-use std::time::Instant;
-
-use esp_idf_hal::{delay, peripherals::Peripherals, units::FromValueType};
-
-use esp_idf_hal::ledc::{
-    config::TimerConfig,
-    {LedcDriver, LedcTimerDriver},
+use esp_idf_svc::hal::{
+    delay::FreeRtos,
+    ledc::{
+        config::TimerConfig,
+        {LedcDriver, LedcTimerDriver},
+    },
+    peripherals::Peripherals,
+    units::FromValueType,
 };
+use esp_idf_svc::timer::EspTaskTimerService;
 
 use lvgl::font::Font;
 use lvgl::style::Style;
 use lvgl::widgets::Label;
 use lvgl::{Align, Color, Display, DrawBuffer, Part, TextAlign, Widget};
 
-use crate::lcd_panel::{LcdPanel, PanelConfig, PanelFlagsConfig, TimingFlagsConfig, TimingsConfig};
+use crate::lcd_panel::{EspLcdRgbPanel, RgbPanelConfigBuilder};
 
 fn main() {
     // It is necessary to call this function once. Otherwise some patches to the runtime
@@ -33,7 +36,7 @@ fn main() {
 
     const HOR_RES: u32 = 800;
     const VER_RES: u32 = 480;
-    const LINES: u32 = 12; // The number of lines (rows) that will be refreshed
+    const LINES: u32 = 2; // The number of lines (rows) that will be refreshed
 
     let peripherals = Peripherals::take().unwrap();
 
@@ -43,6 +46,7 @@ fn main() {
     //============================================================================================================
     //               Create the LedcDriver to drive the backlight on the Lcd Panel
     //============================================================================================================
+    info!("Create LedcDriver");
     let mut channel = LedcDriver::new(
         peripherals.ledc.channel0,
         LedcTimerDriver::new(
@@ -53,23 +57,57 @@ fn main() {
         pins.gpio2,
     )
     .unwrap();
-    channel.set_duty(channel.get_max_duty() / 2).unwrap();
-    info!("Backlight turned on");
 
-    lvgl::init();
+    channel.set_duty(channel.get_max_duty()).unwrap();
+    info!("Backlight turned on");
 
     //============================================================================================================
     //                         Create driver for the LCD Panel
     //============================================================================================================
-    let mut lcd_panel = LcdPanel::new(
-        &PanelConfig::new(),
-        &PanelFlagsConfig::new(),
-        &TimingsConfig::new(),
-        &TimingFlagsConfig::new(),
-    )
-    .unwrap();
+    info!("Create LCD panel");
+    let lcd_panel_config = RgbPanelConfigBuilder::new()
+        .h_res(800)
+        .v_res(480)
+        .pclk_hz(16_000_000)
+        .hsync_pulse_width(1)
+        .hsync_back_porch(16)
+        .hsync_front_porch(210)
+        .vsync_pulse_width(1)
+        .vsync_back_porch(10)
+        .vsync_front_porch(22)
+        .hsync_idle_low(false)
+        .vsync_idle_low(false)
+        .de_idle_high(false)
+        .pclk_active_neg(true)
+        .pclk_idle_high(false)
+        .clk_src_ppl240m(true) // CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ_240=y must be set in sdkconfig.defaults
+        .data_width(16)
+        .bits_per_pixel(0)
+        .num_fbs(1)
+        .bounce_buffer_size_px(3200)
+        .sram_trans_align(8) // tried 16, 32, 64 but did not make a differnce
+        .dma_burst_size(64)
+        .hsync_gpio_num(39)
+        .vsync_gpio_num(40)
+        .de_gpio_num(41)
+        .pclk_gpio_num(42)
+        .disp_gpio_num(-1)
+        // gpio's for RGB565 data lines - [B3, B4, B5, B6, B7,   G2, G3, G4, G5, G6, G7    R3, R4, R5, R6, R7]
+        //                                [15,  7,  6,  5,  4,    9, 46,  3,  8, 16,  1,   14, 21, 47, 48, 45]
+        .data_gpio_nums(&[15, 7, 6, 5, 4, 9, 46, 3, 8, 16, 1, 14, 21, 47, 48, 45])
+        .disp_active_low(false)
+        .refresh_on_demand(false)
+        .fb_in_psram(true)
+        .double_fb(false)
+        .no_fb(false)
+        .bb_invalidate_cache(false)
+        .build();
 
-    info!("=============  Registering Display ====================");
+    let mut lcd_panel = EspLcdRgbPanel::new(lcd_panel_config).unwrap();
+
+    lvgl::init();
+
+    info!("Registering Display");
     let buffer = DrawBuffer::<{ (HOR_RES * LINES) as usize }>::default();
     let display = Display::register(buffer, HOR_RES, VER_RES, |refresh| {
         lcd_panel
@@ -88,6 +126,7 @@ fn main() {
     //                               Create the User Interface
     //===========================================================================================================
     // Create screen and widgets
+    info!("Creating UI");
     let mut screen = display.get_scr_act().unwrap();
     let mut screen_style = Style::default();
     screen_style.set_bg_color(Color::from_rgb((0, 0, 255)));
@@ -109,21 +148,34 @@ fn main() {
 
     let mut i = 0;
 
+    // Create a periodic timer to call LVGL tick. LVGL needs a system tick to know elapsed time for animations and other tasks.
+    info!("Creating Lvgl Tick Timer");
+    let timer_service_01 = EspTaskTimerService::new().unwrap();
+    let lvgl_tick_timer = timer_service_01
+        .timer(move || {
+            lvgl::tick_inc(Duration::from_millis(10));
+        })
+        .unwrap();
+
+    // Let it trigger every 10 milliseconds
+    lvgl_tick_timer.every(Duration::from_millis(10)).unwrap();
+
     loop {
-        let start = Instant::now();
+        //let start = Instant::now();
+
         if i > 59 {
             i = 0;
         }
 
         let val = CString::new(format!("21:{:02}", i)).unwrap();
-        time.set_text(&val).unwrap();
+        time.set_text(&val);
         i += 1;
 
         lvgl::task_handler();
 
         // Simulate clock - so sleep for one second so time text is incremented in seconds
-        delay::FreeRtos::delay_ms(1000);
+        FreeRtos::delay_ms(1000);
 
-        lvgl::tick_inc(Instant::now().duration_since(start));
+        //lvgl::tick_inc(Instant::now().duration_since(start));
     }
 }

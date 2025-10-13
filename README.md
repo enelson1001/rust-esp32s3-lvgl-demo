@@ -9,15 +9,6 @@ Aliexpress ESP32-8048S070 - 7 inch 800x400 TN RGB with ESP32S3, 8M PSRAM, 16M Fl
 This application shows how to use lv-binding-rust crate on a ESP32S3 device.  The program will display a clock time on a blue backgound screen.
 The clock time is a simulated time of 21:00 to 21::59 where the seconds are incremented each second and repeats the 00-59 seconds forever.
 
-## Comments
-I use linux-mint as my development PC and I had to install gcc-multilib or else I got an error 'bits/libc-header-start.h' file not found.
-
-```
-$ sudo apt update
-$ sudo apt upgrade
-$ sudo apt-get install gcc-multilib
-```
-
 ## partition-table folder
 The partition-table folder contains a file called partitons.csv.  This file increases the default factory/app partiton from the default of 1M to 3M. This allows us more space for our program and since the flash size is 16M this should not be a problem.  This file will be called when we flash the device.
 
@@ -44,75 +35,97 @@ CONFIG_SPIRAM_SPEED_80M=y
 # the Frame Buffer is allocated from the PSRAM and fetched by EDMA
 CONFIG_SPIRAM_FETCH_INSTRUCTIONS=y
 CONFIG_SPIRAM_RODATA=y
+
+CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ_240=y
 ```
 
 ## Cargo.toml project file
 I added the following to the "dependencies" section.
 ```
-esp-idf-hal = { version = "0.42.5" }
-esp-idf-sys = { version = "0.33.7"}
+# Logging
+log = "0.4"
 
-cstr_core = "0.2.1"
-embedded-graphics-core = "0.4.0"
+# ESP specifics
+esp-idf-svc = "0.51"
 
+# LVGL
 lvgl = { version = "0.6.2", default-features = false, features = [
     "embedded_graphics",
     "unsafe_no_autoinit",
+    #"lvgl_alloc",
+    #"alloc"
 ] }
 
 lvgl-sys = { version = "0.6.2" }
 
+# Hardware IO Abstraction Layer
+embedded-hal = {version = "1.0.0"}
+embedded-graphics-core = "0.4.0"
+
+# Error
+anyhow = "1.0"
+
+# C String
+cstr_core = "0.2.1"
 ```
 
-Also included patch.crates-io section to patch esp-idf-sys, lvgl and lvgl-sys
+Also included patch.crates-io section to patch esp-idf-sys, esp-idf-svc, esp-idf-hal, lvgl and lvgl-sys
 ```
 [patch.crates-io]
-esp-idf-sys = { git = "https://github.com/esp-rs/esp-idf-sys"}
 lvgl = { git = "https://github.com/enelson1001/lv_binding_rust"}
 lvgl-sys = { git = "https://github.com/enelson1001/lv_binding_rust"}
 
+# Need to use Master branch if using esp-idf greater than version 5.2 (ie v5.4.2, v5.5.1)otherwise esp_lcd_panel_rgb.h is not included
+esp-idf-sys = { git =  "https://github.com/esp-rs/esp-idf-sys.git"}
+
+# Need to use Master branch if using esp-idf v5.5.1 or else you will get the following 2 errors
+# error[E0422]: cannot find struct, variant or union type `twai_timing_config_t__bindgen_ty_1` in this scope
+# error[E0560]: struct `esp_idf_sys::twai_timing_config_t` has no field named `__bindgen_anon_1`
+esp-idf-hal = { git =  "https://github.com/esp-rs/esp-idf-hal.git"}
+esp-idf-svc = { git =  "https://github.com/esp-rs/esp-idf-svc.git"}
 ```
 
 ## config.toml
 To get lv-bindings-rust to comple and build I made the following changes to the config.toml file. 
 ```
 [build]
-target = "xtensa-esp32-espidf"
+target = "xtensa-esp32s3-espidf"
 
-[target.xtensa-esp32-espidf]
+[target.xtensa-esp32s3-espidf]
 linker = "ldproxy"
-# runner = "espflash --monitor" # Select this runner for espflash v1.x.x
-runner = "espflash flash --monitor" # Select this runner for espflash v2.x.x
-rustflags = [
-    # Extending time_t for ESP IDF 5: https://github.com/esp-rs/rust/issues/110
-    "--cfg",
-    "espidf_time64",
-
-    # Added the following 2 entries so lvgl will build without getting string.h file not found
-    "--sysroot",
-    "/home/ed/.rustup/toolchains/esp/xtensa-esp32s3-elf/esp-13.2.0_20230928/xtensa-esp-elf/xtensa-esp-elf/include",
-]
+runner = "espflash flash --monitor"
+rustflags = [ "--cfg",  "espidf_time64",]
 
 [unstable]
 build-std = ["std", "panic_abort"]
 
 [env]
-MCU = "esp32"
+MCU="esp32s3"
+
 # Note: this variable is not used by the pio builder (`cargo build --features pio`)
-ESP_IDF_VERSION = "v5.1.1"
+#ESP_IDF_VERSION = "v5.4.2"
+ESP_IDF_VERSION = "v5.5.1"
 
 # The directory that has the lvgl config files - lv_conf.h, lv_drv_conf.h
 DEP_LV_CONFIG_PATH = { relative = true, value = "lvgl-configs" }
 
-# Required to make lvgl build correctly otherwise get wrong file type
-CROSS_COMPILE = "xtensa-esp32-elf"
+# Required to make lvgl build correctly otherwise get wrong file type (ie compiled for a big endian system and target is little endian)
+CROSS_COMPILE = "xtensa-esp32s3-elf"
+
+# Required for lvgl otherwise the build would fail with the error -> dangerous relocation: call8: call target out of range
+# for some lvgl functions
+CFLAGS_xtensa_esp32s3_espidf="-mlongcalls"
 
 # Directory for custom fonts (written in C) that Lvgl can use
 LVGL_FONTS_DIR = {relative = true, value = "custom-fonts"}
+
+# Required for lvgl to build otherwise you will get string.h not found.
+# Verfiy path and toolchain version being used on your PC (esp-14.2.0_20240906)
+TARGET_C_INCLUDE_PATH = "/home/ed/.rustup/toolchains/esp/xtensa-esp-elf/esp-15.2.0_20250920/xtensa-esp-elf/xtensa-esp-elf/include"
 ```
 
 ## lv-binding-rust fork
-I updated my fork of lv-binding-rust to include PR153 ie the changes recommended by madwizard-thomas.
+I used my fork of lv-binding-rust
 
 ## Flashing the ESP32S3 device
 I used the following command to flash the ESP32S3 device.
@@ -127,3 +140,12 @@ $ cargo espflash flash --partition-table=partition-table/partitions.csv --monito
 # Versions
 ### v1.0 : 
 - initial release
+
+## Change History
+Oct 13, 2025 
+- Code cleanup
+- Update lcd_panel.rs to use builder for easier user implementation for different LCD displays
+- Tested with the following versions
+    - Rust: rustc 1.90.0 (1159e78c4 2025-09-14)
+    - espup: espup 0.16.0
+    - esp-idf: v5.42 or v5.5.1

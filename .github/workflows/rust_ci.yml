@@ -11,6 +11,9 @@ env:
   CARGO_TERM_COLOR: always
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+  # Required otherwise lgvl-sys would fail to build with string.h not found
+  TARGET_C_INCLUDE_PATH: "/home/runner/.rustup/toolchains/esp/xtensa-esp-elf/esp-15.2.0_20250920/xtensa-esp-elf/xtensa-esp-elf/include"
+
 jobs:
   rust-checks:
     name: Rust Checks

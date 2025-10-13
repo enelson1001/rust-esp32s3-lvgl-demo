@@ -17,3 +17,8 @@ CONFIG_SPIRAM_SPEED_80M=y
 # the Frame Buffer is allocated from the PSRAM and fetched by EDMA
 CONFIG_SPIRAM_FETCH_INSTRUCTIONS=y
 CONFIG_SPIRAM_RODATA=y
+
+# Set to get better performance, defualt cpu frequency is 160MHz.  Using 240MHz will improve FPS and CPU ultilization.
+# You can verify this by setting LV_USE_PERF_MONITOR  to 1 in lv_config.h file - Line 246
+# On boot up you should see the following on the terminal display "I (874) cpu_start: cpu freq: 240000000 Hz"
+CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ_240=y
